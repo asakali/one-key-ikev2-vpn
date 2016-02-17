@@ -257,59 +257,76 @@ function get_key(){
 function configure_ipsec(){
  cat > /usr/local/etc/ipsec.conf<<-EOF
 config setup
-    uniqueids=never 
+    uniqueids=never
 
-conn iOS_cert
+#所有项目共用的配置项
+conn %default
+    keyexchange=ike
+    left=%any
+    leftsubnet=0.0.0.0/0
+    right=%any
+
+conn IKE-BASE
+    leftca=ca.cert.pem
+    leftcert=server.cert.pem
+    rightsourceip=10.0.0.0/24
+
+#供 ios 使用, 使用客户端证书
+conn IPSec-IKEv1
+    also=IKE-BASE
     keyexchange=ikev1
     fragmentation=yes
-    left=%defaultroute
+    ike=aes256-sha1-modp1024
     leftauth=pubkey
-    leftsubnet=0.0.0.0/0
-    leftcert=server.cert.pem
-    right=%any
     rightauth=pubkey
     rightauth2=xauth
-    rightsourceip=10.31.2.0/24
     rightcert=client.cert.pem
     auto=add
 
-conn android_xauth_psk
+#供 ios 使用, 使用 PSK 预设密钥
+conn IPSec-IKEv1-PSK
+    also=IKE-BASE
     keyexchange=ikev1
-    left=%defaultroute
+    fragmentation=yes
     leftauth=psk
-    leftsubnet=0.0.0.0/0
-    right=%any
     rightauth=psk
     rightauth2=xauth
-    rightsourceip=10.31.2.0/24
     auto=add
 
-conn networkmanager-strongswan
+#供 android, linux, os x 使用
+conn IPSec-IKEv2
+    also=IKE-BASE
     keyexchange=ikev2
-    left=%defaultroute
     leftauth=pubkey
-    leftsubnet=0.0.0.0/0
-    leftcert=server.cert.pem
-    right=%any
     rightauth=pubkey
-    rightsourceip=10.31.2.0/24
     rightcert=client.cert.pem
     auto=add
+    ike = aes256-sha256-modp1024,3des-sha1-modp1024,aes256-sha1-modp1024!
+    esp = aes256-sha256,3des-sha1,aes256-sha1!
+    leftsendcerts = always
+    leftid = @vpn.asaka.xyz
 
-conn windows7
+#供 windows 7+ 使用, win7 以下版本需使用第三方 ipsec vpn 客户端连接
+conn IPSec-IKEv2-EAP
+    also=IKE-BASE
     keyexchange=ikev2
     ike=aes256-sha1-modp1024!
     rekey=no
-    left=%defaultroute
     leftauth=pubkey
-    leftsubnet=0.0.0.0/0
-    leftcert=server.cert.pem
-    right=%any
     rightauth=eap-mschapv2
-    rightsourceip=10.31.2.0/24
     rightsendcert=never
     eap_identity=%any
     auto=add
+
+conn IKEV2-RSA
+     also=IKE-BASE
+     ikelifetime=60m
+     keylife=20m
+     rekeymargin=3m
+     keyingtries=1
+     keyexchange=ikev2
+     leftfirewall=yes
+     auto=add
 
 EOF
 }
