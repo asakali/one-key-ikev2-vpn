@@ -257,76 +257,40 @@ function get_key(){
 function configure_ipsec(){
  cat > /usr/local/etc/ipsec.conf<<-EOF
 config setup
-    uniqueids=never
+    uniqueids=never              #允许多个客户端使用同一个证书
 
 #所有项目共用的配置项
 conn %default
-    keyexchange=ike
-    left=%any
-    leftsubnet=0.0.0.0/0
-    right=%any
+    keyexchange=ike              #ikev1 或 ikev2 都用这个
+    left=%any                    #服务器端标识,%any表示任意
+    leftsubnet=0.0.0.0/0         #服务器端虚拟ip, 0.0.0.0/0表示通配.
+    right=%any                   #客户端标识,%any表示任意
 
 conn IKE-BASE
-    leftca=ca.cert.pem
-    leftcert=server.cert.pem
-    rightsourceip=10.0.0.0/24
+    leftca=ca.cert.pem           #服务器端 CA 证书
+    leftcert=server.cert.pem     #服务器端证书
+    rightsourceip=10.0.1.0/24    #分配给客户端的虚拟 ip 段
 
-#供 ios 使用, 使用客户端证书
-conn IPSec-IKEv1
-    also=IKE-BASE
-    keyexchange=ikev1
-    fragmentation=yes
-    ike=aes256-sha1-modp1024
-    leftauth=pubkey
-    rightauth=pubkey
-    rightauth2=xauth
-    rightcert=client.cert.pem
-    auto=add
-
-#供 ios 使用, 使用 PSK 预设密钥
-conn IPSec-IKEv1-PSK
-    also=IKE-BASE
-    keyexchange=ikev1
-    fragmentation=yes
-    leftauth=psk
-    rightauth=psk
-    rightauth2=xauth
-    auto=add
-
-#供 android, linux, os x 使用
-conn IPSec-IKEv2
+conn IKEv2-EAP
     also=IKE-BASE
     keyexchange=ikev2
-    leftauth=pubkey
-    rightauth=pubkey
-    rightcert=client.cert.pem
-    auto=add
     ike = aes256-sha256-modp1024,3des-sha1-modp1024,aes256-sha1-modp1024!
     esp = aes256-sha256,3des-sha1,aes256-sha1!
-    leftsendcerts = always
-    leftid = @vpn.asaka.xyz
-
-#供 windows 7+ 使用, win7 以下版本需使用第三方 ipsec vpn 客户端连接
-conn IPSec-IKEv2-EAP
-    also=IKE-BASE
-    keyexchange=ikev2
-    ike=aes256-sha1-modp1024!
-    rekey=no
+    rekey=no                     #服务器对 Windows 发出 rekey 请求会断开连接
+    leftid=vpn.asaka.xyz
     leftauth=pubkey
-    rightauth=eap-mschapv2
+    leftsendcert=always
+    #leftfirewall=yes
+    right=%any
+    rightfirewall=yes
+    rightsourceip=10.0.1.0/24
     rightsendcert=never
+    #rightauth=eap-radius
+    rightauth=eap-mschapv2
     eap_identity=%any
+    dpdaction=clear
+    fragmentation=yes
     auto=add
-
-conn IKEV2-RSA
-     also=IKE-BASE
-     ikelifetime=60m
-     keylife=20m
-     rekeymargin=3m
-     keyingtries=1
-     keyexchange=ikev2
-     leftfirewall=yes
-     auto=add
 
 EOF
 }
